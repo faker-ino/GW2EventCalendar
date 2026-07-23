@@ -14,10 +14,8 @@ grid of the game's recurring bonus events and festivals, right inside the game.
   a short description, a features list, and bonus-effect details (e.g. "+100% WXP") for events the wiki
   tracks. The forum feed only ever carries current and near-future events, so the wiki is also used to
   fill in events just before they're announced on the forum, and recently-ended ones.
-- When both sources have the same event, the forum's dates always win - the wiki is only used for the
+- When both sources have the same event, the forum's date is applied - the wiki is only used for the
   extra descriptive text.
-- No event ever shows a fetched image/icon - every icon-shaped spot in the UI uses the same built-in
-  calendar icon.
 
 Events refresh automatically in the background (every 60-180 minutes, configurable), or on demand with
 the "Refresh" button.
