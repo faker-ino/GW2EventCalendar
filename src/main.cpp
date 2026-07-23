@@ -62,7 +62,7 @@ extern "C" __declspec(dllexport) AddonDefinition_t* GetAddonDef()
     g_addonDef.Signature = 0x47324543; // "G2EC"-ish
     g_addonDef.APIVersion = NEXUS_API_VERSION;
     g_addonDef.Name = "GW2EventCalendar";
-    g_addonDef.Version = { 0, 1, 0, 0 };
+    g_addonDef.Version = { 1, 0, 1, 0 };
     g_addonDef.Author = "faker-ino";
     g_addonDef.Description = "Shows upcoming Guild Wars 2 forum events in a WoW-Calendar-style month grid.";
     g_addonDef.Load = [](AddonAPI_t* aApi) {
@@ -80,8 +80,10 @@ extern "C" __declspec(dllexport) AddonDefinition_t* GetAddonDef()
         g_api->Events_Subscribe(EV_MUMBLE_IDENTITY_UPDATED, OnMumbleIdentityUpdated);
 
         g_api->InputBinds_RegisterWithString(kToggleKeybindId, OnToggleWindowKeybind, "ALT+SHIFT+C");
-        g_api->QuickAccess_Add(kQuickAccessId, kFallbackIconTextureId, kFallbackIconTextureId,
-                                kToggleKeybindId, "GW2 Event Calendar");
+        if (g_settings.show_quickaccess_icon) {
+            g_api->QuickAccess_Add(kQuickAccessId, kFallbackIconTextureId, kFallbackIconTextureId,
+                                    kToggleKeybindId, "GW2 Event Calendar");
+        }
 
         g_api->Log(LOGL_INFO, "GW2EventCalendar", "loaded.");
     };
@@ -137,6 +139,15 @@ static void AddonRender()
 static void AddonOptions()
 {
     if (ImGui::Checkbox("Show Window", &g_settings.window_visible)) {
+        SaveSettings();
+    }
+    if (ImGui::Checkbox("Show QuickAccess Icon", &g_settings.show_quickaccess_icon)) {
+        if (g_settings.show_quickaccess_icon) {
+            g_api->QuickAccess_Add(kQuickAccessId, kFallbackIconTextureId, kFallbackIconTextureId,
+                                    kToggleKeybindId, "GW2 Event Calendar");
+        } else {
+            g_api->QuickAccess_Remove(kQuickAccessId);
+        }
         SaveSettings();
     }
 

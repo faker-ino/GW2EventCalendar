@@ -41,6 +41,9 @@ void LoadSettings(const std::string& path) {
         if (doc.contains("week_starts_monday")) {
             g_settings.week_starts_monday = doc["week_starts_monday"].get<bool>();
         }
+        if (doc.contains("show_quickaccess_icon")) {
+            g_settings.show_quickaccess_icon = doc["show_quickaccess_icon"].get<bool>();
+        }
     } catch (const nlohmann::json::exception&) {
         // malformed file - keep the defaults rather than failing addon load
     }
@@ -59,6 +62,7 @@ void SaveSettings() {
     doc["months_forward"] = g_settings.months_forward;
     doc["refresh_interval_minutes"] = g_settings.refresh_interval_minutes;
     doc["week_starts_monday"] = g_settings.week_starts_monday;
+    doc["show_quickaccess_icon"] = g_settings.show_quickaccess_icon;
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path(g_settingsPath).parent_path(), ec);

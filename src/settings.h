@@ -15,6 +15,7 @@ struct Settings {
     int         months_forward = 3;
     int         refresh_interval_minutes = 180;
     bool        week_starts_monday = true; // false = Sunday-first (US-style), true = Monday-first
+    bool        show_quickaccess_icon = true;
 };
 
 extern Settings g_settings;
