@@ -1,0 +1,10 @@
+{
+  "configurations": [
+    {
+      "name": "x64-debug",
+      "configurationProvider": "ms-vscode.cmake-tools",
+      "intelliSenseMode": "windows-msvc-x64"
+    }
+  ],
+  "version": 4
+}

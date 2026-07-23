@@ -1,0 +1,9 @@
+/build/
+/out/
+*.user
+*.obj
+.vs/
+
+# Never commit a local test settings.json - it can carry the user's real
+# forum feed member id/key (see src/settings.h).
+settings.json
