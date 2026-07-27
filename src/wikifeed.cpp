@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "textsanitize.h"
 #include "wikidate.h"
 
 namespace {
@@ -368,7 +369,7 @@ bool FetchAndParseWikiEvents(std::vector<Event>& out) {
         }
 
         Event e;
-        e.title = hdr.title;
+        e.title = SanitizeForDisplay(hdr.title);
         e.start_utc = hdr.startUtc;
         e.end_utc = hdr.endUtc;
 
@@ -390,10 +391,12 @@ bool FetchAndParseWikiEvents(std::vector<Event>& out) {
                 ExtractNextCell(dataRowHtml, cellPos, cell2);
                 ExtractNextCell(dataRowHtml, cellPos, cell3);
 
-                e.description = ExtractDescription(cell1);
+                e.description = SanitizeForDisplay(ExtractDescription(cell1));
                 e.detail_url = ExtractOfficialPageUrl(cell1);
-                e.features = ExtractFeatures(cell2);
+                e.features = SanitizeForDisplay(ExtractFeatures(cell2));
                 ExtractBonusEffect(cell3, e.bonus_effect_name, e.bonus_effect_description);
+                e.bonus_effect_name = SanitizeForDisplay(e.bonus_effect_name);
+                e.bonus_effect_description = SanitizeForDisplay(e.bonus_effect_description);
 
                 pos = dataRowEnd + strlen("</tr>");
             }

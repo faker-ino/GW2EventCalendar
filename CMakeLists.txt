@@ -37,6 +37,7 @@ add_library(GW2EventCalendar SHARED
     src/main.cpp
     src/settings.cpp
     src/wikidate.cpp
+    src/textsanitize.cpp
     src/icsfeed.cpp
     src/wikifeed.cpp
     src/eventfetcher.cpp

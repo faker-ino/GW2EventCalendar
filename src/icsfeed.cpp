@@ -9,6 +9,8 @@
 #include <cstring>
 #include <ctime>
 
+#include "textsanitize.h"
+
 namespace {
 
 constexpr const char* kBaseUrl = "https://en-forum.guildwars2.com/events/1-game-updates/download/";
@@ -271,7 +273,7 @@ bool FetchAndParseIcsFeed(const std::string& feedUrlOverride, std::vector<Event>
         if (name == "UID") {
             current.uid = ExtractForumId(value);
         } else if (name == "SUMMARY") {
-            current.title = UnescapeIcsText(value);
+            current.title = SanitizeForDisplay(UnescapeIcsText(value));
         } else if (name == "DTSTART") {
             current.start_utc = ParseIcsDateTime(value, params.find("VALUE=DATE") != std::string::npos);
         } else if (name == "DTEND") {
