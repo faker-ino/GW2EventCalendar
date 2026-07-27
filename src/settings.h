@@ -2,20 +2,18 @@
 
 #include <string>
 
-// Persisted addon configuration. feed_member_id/feed_key are the user's own
-// forum account credentials for the events RSS feed - never hardcode real
-// values anywhere in source, they only ever live in the on-disk
-// settings.json under the user's own GW2 install (see .gitignore).
+// Persisted addon configuration. feed_url_override is an escape hatch for
+// the rare case the public ICS calendar feed (icsfeed.h) breaks - it needs
+// no auth, so there's no credential equivalent to feed_url_override here.
 struct Settings {
     bool        window_visible = true;
-    std::string feed_member_id;
-    std::string feed_key;
     std::string feed_url_override;
     int         months_back = 1;
     int         months_forward = 3;
     int         refresh_interval_minutes = 180;
     bool        week_starts_monday = true; // false = Sunday-first (US-style), true = Monday-first
     bool        show_quickaccess_icon = true;
+    float       today_highlight_color[3] = {1.0f, 0.843f, 0.0f}; // gold; RGB 0-1, for ImGui::ColorEdit3
 };
 
 extern Settings g_settings;

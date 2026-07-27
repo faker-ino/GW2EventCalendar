@@ -36,8 +36,8 @@ add_custom_command(
 add_library(GW2EventCalendar SHARED
     src/main.cpp
     src/settings.cpp
-    src/rfc822date.cpp
-    src/rssfeed.cpp
+    src/wikidate.cpp
+    src/icsfeed.cpp
     src/wikifeed.cpp
     src/eventfetcher.cpp
     src/calendarui.cpp

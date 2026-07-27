@@ -20,12 +20,6 @@ void LoadSettings(const std::string& path) {
         if (doc.contains("window_visible")) {
             g_settings.window_visible = doc["window_visible"].get<bool>();
         }
-        if (doc.contains("feed_member_id")) {
-            g_settings.feed_member_id = doc["feed_member_id"].get<std::string>();
-        }
-        if (doc.contains("feed_key")) {
-            g_settings.feed_key = doc["feed_key"].get<std::string>();
-        }
         if (doc.contains("feed_url_override")) {
             g_settings.feed_url_override = doc["feed_url_override"].get<std::string>();
         }
@@ -44,6 +38,12 @@ void LoadSettings(const std::string& path) {
         if (doc.contains("show_quickaccess_icon")) {
             g_settings.show_quickaccess_icon = doc["show_quickaccess_icon"].get<bool>();
         }
+        if (doc.contains("today_highlight_color") && doc["today_highlight_color"].is_array() &&
+            doc["today_highlight_color"].size() == 3) {
+            for (int i = 0; i < 3; ++i) {
+                g_settings.today_highlight_color[i] = doc["today_highlight_color"][i].get<float>();
+            }
+        }
     } catch (const nlohmann::json::exception&) {
         // malformed file - keep the defaults rather than failing addon load
     }
@@ -55,14 +55,14 @@ void SaveSettings() {
     }
     nlohmann::json doc;
     doc["window_visible"] = g_settings.window_visible;
-    doc["feed_member_id"] = g_settings.feed_member_id;
-    doc["feed_key"] = g_settings.feed_key;
     doc["feed_url_override"] = g_settings.feed_url_override;
     doc["months_back"] = g_settings.months_back;
     doc["months_forward"] = g_settings.months_forward;
     doc["refresh_interval_minutes"] = g_settings.refresh_interval_minutes;
     doc["week_starts_monday"] = g_settings.week_starts_monday;
     doc["show_quickaccess_icon"] = g_settings.show_quickaccess_icon;
+    doc["today_highlight_color"] = { g_settings.today_highlight_color[0], g_settings.today_highlight_color[1],
+                                      g_settings.today_highlight_color[2] };
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path(g_settingsPath).parent_path(), ec);

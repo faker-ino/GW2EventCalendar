@@ -62,9 +62,9 @@ extern "C" __declspec(dllexport) AddonDefinition_t* GetAddonDef()
     g_addonDef.Signature = 0x47324543; // "G2EC"-ish
     g_addonDef.APIVersion = NEXUS_API_VERSION;
     g_addonDef.Name = "GW2EventCalendar";
-    g_addonDef.Version = { 1, 0, 1, 0 };
+    g_addonDef.Version = { 1, 0, 2, 0 };
     g_addonDef.Author = "faker-ino";
-    g_addonDef.Description = "Shows upcoming Guild Wars 2 forum events in a WoW-Calendar-style month grid.";
+    g_addonDef.Description = "Shows upcoming Guild Wars 2 special events in a calendar-style month grid.";
     g_addonDef.Load = [](AddonAPI_t* aApi) {
         g_api = aApi;
 
@@ -160,6 +160,10 @@ static void AddonOptions()
             g_settings.week_starts_monday = (weekStart == 1);
             SaveSettings();
         }
+    }
+
+    if (ImGui::ColorEdit3("Today highlight color", g_settings.today_highlight_color)) {
+        SaveSettings();
     }
 
     if (ImGui::SliderInt("Months back", &g_settings.months_back, 0, 12)) {

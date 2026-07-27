@@ -237,6 +237,23 @@ ImU32 ColorForEvent(const std::string& uid) {
     return kPalette[h % (sizeof(kPalette) / sizeof(kPalette[0]))];
 }
 
+ImU32 TodayHighlightColor() {
+    const float* c = g_settings.today_highlight_color;
+    return IM_COL32(int(c[0] * 255.0f), int(c[1] * 255.0f), int(c[2] * 255.0f), 255);
+}
+
+// Picks black or white text so the day number stays legible painted on top
+// of whatever accent color the user picks in Options - a light user-chosen
+// color (e.g. pale yellow) would wash out light text, a dark one (e.g. navy)
+// would swallow dark text.
+ImU32 ContrastingTextColor(ImU32 background) {
+    float r = ((background >> IM_COL32_R_SHIFT) & 0xFF) / 255.0f;
+    float g = ((background >> IM_COL32_G_SHIFT) & 0xFF) / 255.0f;
+    float b = ((background >> IM_COL32_B_SHIFT) & 0xFF) / 255.0f;
+    float luminance = 0.299f * r + 0.587f * g + 0.114f * b;
+    return luminance > 0.6f ? IM_COL32(20, 20, 20, 255) : IM_COL32(245, 245, 245, 255);
+}
+
 // Day number + "+N" overflow hint only - the event bars themselves are
 // drawn separately, across the whole row, by RenderWeekRow below.
 //
@@ -257,18 +274,12 @@ ImU32 ColorForEvent(const std::string& uid) {
 // calls BeginPopup with once the table's closed - so it could never open, no
 // matter where or how precisely a cell was clicked. The caller opens the
 // popup itself, outside both scopes.
-bool RenderDayCell(const std::string& dateKey, int day, bool inCurrentMonth, bool isToday,
+bool RenderDayCell(const std::string& dateKey, int day, bool inCurrentMonth,
                     float cellHeight, int hiddenCount, const char* weekdayLabel) {
     ImGui::PushID(dateKey.c_str());
 
     ImVec2 cellMin = ImGui::GetCursorScreenPos();
     ImVec2 cellSize(ImGui::GetContentRegionAvail().x, cellHeight);
-
-    if (isToday) {
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            cellMin, ImVec2(cellMin.x + cellSize.x, cellMin.y + cellSize.y),
-            IM_COL32(255, 215, 0, 40));
-    }
 
     ImGui::TextDisabled("%s", weekdayLabel ? weekdayLabel : "");
 
@@ -455,6 +466,17 @@ void RenderCalendarWindow() {
         bool dayCellClicked = false;
         std::string clickedDate;
 
+        // Captured by the row loop below when it reaches today's cell, then
+        // drawn once after EndTable() - not while the table is still open.
+        // Drawing it inside the table (as an earlier version of this did)
+        // put it underneath the table's own gridlines, which ImGui redraws
+        // when the table closes: everything except the outer-right border
+        // (today's column happening to be the last one) got painted over
+        // and vanished, leaving only a stray vertical sliver visible.
+        bool haveTodayCell = false;
+        ImVec2 todayCellMin, todayCellMax, todayNumCenter;
+        int todayDayNum = 0;
+
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(3.0f, 2.0f));
         if (ImGui::BeginTable("MonthGrid", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit)) {
             for (int col = 0; col < 7; ++col) {
@@ -513,7 +535,7 @@ void RenderCalendarWindow() {
                     }
                     colX[col] = ImGui::GetCursorScreenPos().x;
                     const char* weekdayLabel = row == 0 ? kDayNames[(WeekStartIndex() + col) % 7] : nullptr;
-                    if (RenderDayCell(dateKeys[col], dayNums[col], inMonthFlags[col], dateKeys[col] == today,
+                    if (RenderDayCell(dateKeys[col], dayNums[col], inMonthFlags[col],
                                        rowHeight, hiddenPerCol[col], weekdayLabel)) {
                         dayCellClicked = true;
                         clickedDate = dateKeys[col];
@@ -575,11 +597,60 @@ void RenderCalendarWindow() {
                         ImGui::SetTooltip("%s\n%s", seg.event->title.c_str(), FormatEventRange(*seg.event).c_str());
                     }
                 }
+
+                // colX[col]/colWidth/rowTopY are the cell's content-area
+                // bounds - already inset from the true column/row edges by
+                // the CellPadding pushed above. Expanding back out by that
+                // same padding reaches the actual gridline, so the outlined
+                // cell's edge meets its neighbor's with no sliver of
+                // unoutlined background showing through between them.
+                ImVec2 pad = ImGui::GetStyle().CellPadding;
+
+                // Today's cell outline and day-number badge are just
+                // captured here, not drawn - see haveTodayCell's comment for
+                // why the actual drawing happens after EndTable() instead.
+                for (int col = 0; col < 7; ++col) {
+                    if (dateKeys[col] != today) {
+                        continue;
+                    }
+                    haveTodayCell = true;
+                    todayCellMin = ImVec2(colX[col] - pad.x, rowTopY - pad.y);
+                    todayCellMax = ImVec2(colX[col] + colWidth + pad.x, rowTopY + rowHeight + pad.y);
+                    todayDayNum = dayNums[col];
+                    char numBuf[8];
+                    snprintf(numBuf, sizeof(numBuf), "%d", todayDayNum);
+                    float numHalfWidth = ImGui::CalcTextSize(numBuf).x * 0.5f;
+                    todayNumCenter = ImVec2(colX[col] + numHalfWidth,
+                                             rowTopY + ImGui::GetTextLineHeightWithSpacing() +
+                                                 ImGui::GetTextLineHeight() * 0.5f);
+                }
+
                 ImGui::PopClipRect();
             }
             ImGui::EndTable();
         }
         ImGui::PopStyleVar();
+
+        // Drawn on top of the table itself (gridlines and all) so nothing
+        // painted during EndTable() can cover it. The circle badge behind
+        // the day number is the primary, always-visible indicator; the
+        // full-cell outline reinforces it without competing with the event
+        // bars, which the badge deliberately sits above (in the blank
+        // header strip no bar reaches).
+        if (haveTodayCell) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImU32 accent = TodayHighlightColor();
+            dl->AddRect(todayCellMin, todayCellMax, accent, 0.0f, 0, 2.0f);
+
+            float badgeRadius = ImGui::GetTextLineHeight() * 0.72f;
+            dl->AddCircleFilled(todayNumCenter, badgeRadius, accent);
+
+            char numBuf[8];
+            snprintf(numBuf, sizeof(numBuf), "%d", todayDayNum);
+            ImVec2 textSize = ImGui::CalcTextSize(numBuf);
+            ImVec2 textPos(todayNumCenter.x - textSize.x * 0.5f, todayNumCenter.y - textSize.y * 0.5f);
+            dl->AddText(textPos, ContrastingTextColor(accent), numBuf);
+        }
 
         // Opened here, outside the table's id scope (BeginTable pushes its
         // own id, popped by the EndTable() above) and outside any per-cell

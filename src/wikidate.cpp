@@ -1,7 +1,6 @@
-#include "rfc822date.h"
+#include "wikidate.h"
 
 #include <cctype>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -21,38 +20,6 @@ int MonthFromName(const char* mon) {
 }
 
 } // namespace
-
-time_t ParseRfc822(const std::string& s) {
-    // "Tue, 14 Jul 2026 16:00:00 +0000"
-    char weekday[8] = {};
-    char monthName[8] = {};
-    int day = 0, year = 0, hh = 0, mm = 0, ss = 0;
-    char tz[8] = {};
-
-    int matched = sscanf(s.c_str(), "%7[^,], %d %7s %d %d:%d:%d %7s",
-                          weekday, &day, monthName, &year, &hh, &mm, &ss, tz);
-    if (matched < 7) {
-        return 0; // unexpected format - caller skips this event
-    }
-
-    int month = MonthFromName(monthName);
-    if (month == 0 || day < 1 || day > 31) {
-        return 0;
-    }
-
-    struct tm t = {};
-    t.tm_year = year - 1900;
-    t.tm_mon = month - 1;
-    t.tm_mday = day;
-    t.tm_hour = hh;
-    t.tm_min = mm;
-    t.tm_sec = ss;
-
-    // _mkgmtime interprets the struct as UTC directly (no local-timezone
-    // conversion, unlike mktime) - correct here since the feed's trailing
-    // "+0000" confirms every timestamp is already UTC.
-    return _mkgmtime(&t);
-}
 
 time_t ParseWikiDate(const std::string& s) {
     int month = 0, day = 0, year = 0;
@@ -94,5 +61,5 @@ time_t ParseWikiDate(const std::string& s) {
     t.tm_year = year - 1900;
     t.tm_mon = month - 1;
     t.tm_mday = day;
-    return _mkgmtime(&t); // midnight UTC on that day, same convention as ParseRfc822
+    return _mkgmtime(&t); // midnight UTC on that day - _mkgmtime interprets the struct as UTC directly, no local-timezone conversion
 }

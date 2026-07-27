@@ -9,7 +9,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "rssfeed.h"
+#include "icsfeed.h"
 #include "settings.h"
 #include "wikifeed.h"
 
@@ -180,39 +180,24 @@ void EventStore::SaveCache() const {
 
 void EventStore::FetchThreadMain() {
     std::vector<Event> events;
-    bool ok = FetchAndParseRssFeed(g_settings.feed_url_override, g_settings.feed_member_id,
-                                    g_settings.feed_key, events);
+    bool ok = FetchAndParseIcsFeed(g_settings.feed_url_override, events);
     if (!ok) {
         error_ = true;
         return; // keep whatever data_ already holds - don't blank the UI on a transient blip
     }
 
-    // The RSS feed only ever carries current+near-future events, and even
-    // for those carries no description/features/bonus-effect data at all.
-    // The wiki's "Special event" page tracks the same rotation with all of
-    // that extra detail plus a running Historical table (and sometimes an
-    // Upcoming entry the feed hasn't published yet) going back years. RSS
-    // stays authoritative on title/dates/forum-link for any event both
-    // sources carry - matched by forum event id, which is both the RSS
-    // <guid> and the numeric id embedded in the wiki's "official page" link
-    // (see wikifeed.cpp's ExtractEventId) - but gets enriched with that
-    // event's wiki fields when a match exists. Wiki events with no RSS
-    // match at all (the historical/upcoming gaps) get added outright - EXCEPT
-    // when we've already captured that same uid from RSS on some earlier
-    // fetch (i.e. it just aged out of the feed's rolling window this time):
-    // in that case keep the previously-cached, RSS-confirmed dates/link
-    // instead of the wiki's, since the wiki's "Month D, YYYY" text is
-    // date-only (no time-of-day) and has been observed a full day off from
-    // the real UTC boundary the forum's own event page reports (e.g. wiki
-    // editors seem to transcribe whichever local day the event felt like).
-    // Only description/features/bonus-effect fields get refreshed from the
-    // wiki in that case.
-    std::map<std::string, Event> previousByUid;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        previousByUid = FlattenByUid(data_);
-    }
-
+    // The ICS feed carries this calendar's full history and future, with
+    // precise UTC dates, but no description/features/bonus-effect data at
+    // all. The wiki's "Special event" page tracks the same rotation with
+    // all of that extra detail. The ICS feed stays authoritative on
+    // title/dates/forum-link for any event both sources carry - matched by
+    // forum event id, which is both the ICS UID's leading number and the
+    // numeric id embedded in the wiki's "official page" link (see
+    // wikifeed.cpp's ExtractEventId) - but gets enriched with that event's
+    // wiki fields when a match exists. Wiki events with no ICS match at all
+    // are genuinely wiki-only (pre-forum-calendar historical events, or an
+    // upcoming entry the wiki has posted before the forum calendar has) and
+    // get added outright, using the wiki's own dates/link.
     std::vector<Event> wikiEvents;
     if (FetchAndParseWikiEvents(wikiEvents)) {
         std::map<std::string, const Event*> wikiById;
@@ -232,25 +217,15 @@ void EventStore::FetchThreadMain() {
             e.bonus_effect_description = w.bonus_effect_description;
         }
 
-        std::set<std::string> rssIds;
+        std::set<std::string> icsIds;
         for (const auto& e : events) {
-            rssIds.insert(e.uid);
+            icsIds.insert(e.uid);
         }
         for (auto& e : wikiEvents) {
-            if (rssIds.count(e.uid)) {
+            if (icsIds.count(e.uid)) {
                 continue;
             }
-            auto prev = previousByUid.find(e.uid);
-            if (prev != previousByUid.end()) {
-                Event merged = prev->second;
-                merged.description = e.description;
-                merged.features = e.features;
-                merged.bonus_effect_name = e.bonus_effect_name;
-                merged.bonus_effect_description = e.bonus_effect_description;
-                events.push_back(std::move(merged));
-            } else {
-                events.push_back(std::move(e));
-            }
+            events.push_back(std::move(e));
         }
     }
 

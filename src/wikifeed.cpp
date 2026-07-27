@@ -8,14 +8,14 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "rfc822date.h"
+#include "wikidate.h"
 
 namespace {
 
 constexpr wchar_t kWikiHost[] = L"wiki.guildwars2.com";
 constexpr wchar_t kWikiPath[] = L"/index.php?title=Special_event&action=render";
 
-// Same request pattern as rssfeed.cpp's HttpsGet - duplicated rather than
+// Same request pattern as icsfeed.cpp's HttpsGet - duplicated rather than
 // shared across translation units, since each is the only caller it has.
 std::string HttpsGet(const wchar_t* host, const wchar_t* path) {
     std::string result;
