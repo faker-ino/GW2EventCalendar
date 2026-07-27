@@ -7,13 +7,15 @@ grid of the game's recurring bonus events and festivals, right inside the game.
 
 ## Where the data comes from
 
-- **Primary source**: the official GW2 forum's [Events calendar](https://en-forum.guildwars2.com/events/),
-  via its public RSS feed. This gives each event's title, forum link, and exact start/end time, and needs
-  no login or setup - it just works out of the box.
+- **Primary source**: the official GW2 forum's ["Game Updates" calendar](https://en-forum.guildwars2.com/events/1-game-updates/),
+  via its public iCalendar feed. This gives each event's title, forum link, and exact start/end time,
+  covers the calendar's full history and everything upcoming, and needs no login or setup - it just
+  works out of the box.
 - **Enrichment**: the [GW2 Wiki's Special Event page](https://wiki.guildwars2.com/wiki/Special_event) adds
   a short description, a features list, and bonus-effect details (e.g. "+100% WXP") for events the wiki
-  tracks. The forum feed only ever carries current and near-future events, so the wiki is also used to
-  fill in events just before they're announced on the forum, and recently-ended ones.
+  tracks. The forum feed carries no descriptive text like this at all, so the wiki is also used to fill
+  in a small number of genuinely wiki-only events (ones from before the forum calendar existed, or posted
+  to the wiki just ahead of the forum).
 - When both sources have the same event, the forum's date is applied - the wiki is only used for the
   extra descriptive text.
 
@@ -31,6 +33,9 @@ the "Refresh" button.
 
 ### Options
 
-If the anonymous forum feed ever stops working, `settings.json` (next to the addon's own data folder)
-also accepts `feed_member_id`/`feed_key` (a personal forum auth token) or a full `feed_url_override` -
-these have no in-game UI and are meant as a manual fallback, not routine setup.
+- How many months back and forward to show, the background refresh interval, whether the week starts on
+  Monday or Sunday, whether the QuickAccess toolbar icon is shown, and a customizable highlight color for
+  today's cell are all in the addon's options panel.
+- If the anonymous forum feed ever stops working, `settings.json` (next to the addon's own data folder)
+  also accepts a full `feed_url_override` - this has no in-game UI and is meant as a manual fallback, not
+  routine setup.
