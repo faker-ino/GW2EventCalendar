@@ -3,7 +3,8 @@
 A [Nexus](https://github.com/RaidcoreGG/Nexus) addon for Guild Wars 2 that shows a calendar-style month
 grid of the game's recurring bonus events and festivals, right inside the game.
 
-<img width="800" height="575" alt="grafik" src="https://github.com/user-attachments/assets/eeabb643-488b-43c9-b038-45bb3c99bc85" />
+<img width="787" height="825" alt="grafik" src="https://github.com/user-attachments/assets/8185f0bc-0009-4bb2-bfe9-fc2dadcfd088" />
+
 
 ## Where the data comes from
 
