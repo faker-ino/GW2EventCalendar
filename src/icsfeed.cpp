@@ -213,6 +213,29 @@ std::string ExtractForumId(const std::string& uidValue) {
     return uidValue.substr(0, i);
 }
 
+// The forum used to redirect the bare "/events/event/<id>/" permalink to the
+// full "/events/event/<id>-<title-slug>/" URL, but it no longer does - the
+// bare form now 404s, while *any* non-empty hyphenated suffix after the id
+// resolves (canonicalizing via redirect if the slug doesn't exactly match).
+// So this only needs to produce a reasonable slug, not an exact one.
+std::string SlugifyTitle(const std::string& title) {
+    std::string out;
+    out.reserve(title.size());
+    bool pendingDash = false;
+    for (unsigned char c : title) {
+        if (isalnum(c)) {
+            if (pendingDash && !out.empty()) {
+                out += '-';
+            }
+            pendingDash = false;
+            out += (char)tolower(c);
+        } else {
+            pendingDash = true;
+        }
+    }
+    return out;
+}
+
 } // namespace
 
 bool FetchAndParseIcsFeed(const std::string& feedUrlOverride, std::vector<Event>& out) {
@@ -254,7 +277,9 @@ bool FetchAndParseIcsFeed(const std::string& feedUrlOverride, std::vector<Event>
                     current.end_utc = current.start_utc;
                 }
                 if (!current.uid.empty() && current.start_utc != 0) {
-                    current.detail_url = "https://en-forum.guildwars2.com/events/event/" + current.uid + "/";
+                    std::string slug = SlugifyTitle(current.title);
+                    current.detail_url = "https://en-forum.guildwars2.com/events/event/" + current.uid +
+                                          "-" + (slug.empty() ? "event" : slug) + "/";
                     parsed.push_back(current);
                 }
             }
