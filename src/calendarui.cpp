@@ -6,11 +6,18 @@
 #include <ctime>
 #include <functional>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
 #include <windows.h>
 #include <shellapi.h>
+#include <objbase.h>
+#include <userenv.h>
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "advapi32.lib")
+#pragma comment(lib, "userenv.lib")
 
 #include "imgui.h"
 #include "Nexus.h"
@@ -120,12 +127,139 @@ Texture_t* GetFallbackTexture() {
     return tex;
 }
 
+// Looks up the command line registered for the user's default browser
+// (e.g. `"C:\...\firefox.exe" -osint -url "%1"`), the same way ShellExecute
+// resolves "open a URL" internally - reimplemented here (rather than just
+// calling ShellExecuteW) because CreateProcessW is the only way to control
+// the child process's environment block (see LaunchBrowserWithCleanEnvironment's
+// comment for why that matters), which ShellExecuteW/Ex don't expose.
+// Returns an empty string if no per-user choice is registered (falls back
+// to the HTTP ProgID's own default).
+static std::wstring GetDefaultHttpHandlerCommand()
+{
+    std::wstring progId;
+    HKEY userChoiceKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER,
+            L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice",
+            0, KEY_READ, &userChoiceKey) == ERROR_SUCCESS) {
+        wchar_t buf[256] = {};
+        DWORD size = sizeof(buf);
+        DWORD type = 0;
+        if (RegQueryValueExW(userChoiceKey, L"ProgId", nullptr, &type, (LPBYTE)buf, &size) == ERROR_SUCCESS && type == REG_SZ) {
+            progId = buf;
+        }
+        RegCloseKey(userChoiceKey);
+    }
+    if (progId.empty()) {
+        progId = L"http"; // fall back to HKCR\http\shell\open\command directly
+    }
+
+    std::wstring command;
+    HKEY commandKey;
+    if (RegOpenKeyExW(HKEY_CLASSES_ROOT, (progId + L"\\shell\\open\\command").c_str(), 0, KEY_READ, &commandKey) == ERROR_SUCCESS) {
+        wchar_t buf[1024] = {};
+        DWORD size = sizeof(buf);
+        DWORD type = 0;
+        if (RegQueryValueExW(commandKey, nullptr, nullptr, &type, (LPBYTE)buf, &size) == ERROR_SUCCESS &&
+            (type == REG_SZ || type == REG_EXPAND_SZ)) {
+            command = buf;
+        }
+        RegCloseKey(commandKey);
+    }
+    return command;
+}
+
+// Launches `url` in the default browser via CreateProcessW with a clean,
+// non-redirected environment block, instead of just calling ShellExecuteW.
+// Needed specifically for GW2Launcher users: GW2Launcher runs multiple
+// simultaneous GW2 clients by redirecting each instance's %APPDATA%/
+// %LOCALAPPDATA%/%USERPROFILE% to an isolated per-account folder. A browser
+// spawned the normal way (ShellExecuteW, which inherits the calling
+// process's environment) inherits that redirection too, so it resolves a
+// DIFFERENT browser profile than the user's real, already-running one - and
+// then can't recognize it as "the same" instance to hand a URL off to,
+// which for Firefox specifically surfaces as an "already running, but not
+// responding" dialog (root-caused via diagnostic logging in the sibling
+// DrfGoldTracker addon, which hit the exact same bug from the exact same
+// cause - its Wiki menu item had this identical ShellExecuteW call).
+// CreateEnvironmentBlock resolves the real per-user environment straight
+// from the token, bypassing whatever the calling process's own (possibly
+// redirected) environment variables currently say. CREATE_BREAKAWAY_FROM_JOB
+// is also passed since GW2 is commonly run inside a Job Object (Steam wraps
+// games in one); harmless if the job doesn't allow it or there isn't one.
+// Returns false (caller falls back to plain ShellExecuteW) if the registry
+// lookup or CreateProcessW fails for any reason - better a browser window
+// opens with the wrong profile than not at all.
+static bool LaunchBrowserWithCleanEnvironment(const std::wstring& url)
+{
+    const std::wstring commandTemplate = GetDefaultHttpHandlerCommand();
+    if (commandTemplate.empty()) {
+        return false;
+    }
+
+    const std::wstring quotedUrl = L"\"" + url + L"\"";
+    std::wstring commandLine = commandTemplate;
+    const size_t placeholder = commandLine.find(L"%1");
+    if (placeholder != std::wstring::npos) {
+        commandLine.replace(placeholder, 2, quotedUrl);
+    } else {
+        commandLine += L" " + quotedUrl;
+    }
+
+    // CreateProcessW requires a mutable buffer for lpCommandLine (it may
+    // write a null terminator into it in place) - a std::wstring's internal
+    // buffer isn't guaranteed mutable-safe for that even via &str[0].
+    std::vector<wchar_t> mutableCommandLine(commandLine.begin(), commandLine.end());
+    mutableCommandLine.push_back(L'\0');
+
+    LPVOID environmentBlock = nullptr;
+    HANDLE processToken = nullptr;
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &processToken)) {
+        CreateEnvironmentBlock(&environmentBlock, processToken, FALSE);
+        CloseHandle(processToken);
+    }
+
+    STARTUPINFOW startupInfo = { sizeof(startupInfo) };
+    PROCESS_INFORMATION processInfo = {};
+    const BOOL ok = CreateProcessW(nullptr, mutableCommandLine.data(), nullptr, nullptr, FALSE,
+        CREATE_BREAKAWAY_FROM_JOB | (environmentBlock ? CREATE_UNICODE_ENVIRONMENT : 0),
+        environmentBlock, nullptr, &startupInfo, &processInfo);
+
+    if (environmentBlock) {
+        DestroyEnvironmentBlock(environmentBlock);
+    }
+    if (!ok) {
+        return false;
+    }
+    CloseHandle(processInfo.hThread);
+    CloseHandle(processInfo.hProcess);
+    return true;
+}
+
+// Opens `url` in the default browser, preferring LaunchBrowserWithCleanEnvironment
+// (see its comment) and falling back to plain ShellExecuteW if that fails
+// for any reason. Runs on a dedicated, detached thread with its own STA COM
+// apartment, since the ShellExecuteW fallback needs COM initialized and
+// this keeps both paths off the render thread.
+static void OpenUrlInBrowser(const std::string& url)
+{
+    std::thread([url]() {
+        const bool comInitialized = SUCCEEDED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
+        std::wstring wideUrl(url.begin(), url.end()); // url is pure ASCII - safe narrow->wide widen
+        if (!LaunchBrowserWithCleanEnvironment(wideUrl)) {
+            ShellExecuteW(nullptr, L"open", wideUrl.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        }
+        if (comInitialized) {
+            CoUninitialize();
+        }
+    }).detach();
+}
+
 void OpenForumLink(const std::string& url) {
     if (url.empty()) {
         return;
     }
-    std::wstring wideUrl(url.begin(), url.end()); // url is pure ASCII - safe narrow->wide widen
-    ShellExecuteW(nullptr, L"open", wideUrl.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    OpenUrlInBrowser(url);
 }
 
 // Trims text to fit maxWidth (current font/scale), appending "..." - used

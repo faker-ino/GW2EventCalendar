@@ -62,7 +62,7 @@ extern "C" __declspec(dllexport) AddonDefinition_t* GetAddonDef()
     g_addonDef.Signature = 0x47324543; // "G2EC"-ish
     g_addonDef.APIVersion = NEXUS_API_VERSION;
     g_addonDef.Name = "GW2EventCalendar";
-    g_addonDef.Version = { 1, 0, 2, 2 };
+    g_addonDef.Version = { 1, 0, 2, 3 };
     g_addonDef.Author = "faker-ino";
     g_addonDef.Description = "Shows upcoming Guild Wars 2 special events in a calendar-style month grid.";
     g_addonDef.Load = [](AddonAPI_t* aApi) {
